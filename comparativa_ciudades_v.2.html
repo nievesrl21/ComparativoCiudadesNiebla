@@ -1,0 +1,678 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Comparativa de Ciudades · Base Chamberí</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://unpkg.com/lucide@0.469.0/dist/umd/lucide.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+  body { font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; }
+  .scroll-thin::-webkit-scrollbar { height: 8px; width: 8px; }
+  .scroll-thin::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 9999px; }
+  input[type=range] { accent-color: #059669; }
+  .fade-in { animation: fade .25s ease-out; }
+  @keyframes fade { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+  details > summary { list-style: none; }
+  details > summary::-webkit-details-marker { display: none; }
+  details[open] .chev { transform: rotate(180deg); }
+</style>
+</head>
+<body class="bg-slate-50 text-slate-800 antialiased">
+
+<!-- ============ CABECERA ============ -->
+<header class="bg-gradient-to-br from-slate-900 via-blue-950 to-blue-800 text-white">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 py-8 sm:py-10">
+    <div class="flex items-center gap-2 text-emerald-300 text-xs font-semibold uppercase tracking-wider">
+      <i data-lucide="globe" class="w-4 h-4"></i> Movilidad internacional · Edición 2026
+    </div>
+    <h1 class="mt-2 text-2xl sm:text-4xl font-bold tracking-tight">Dashboard comparativo de ciudades europeas</h1>
+    <p class="mt-3 max-w-3xl text-blue-100/90 text-sm sm:text-base">
+      Nueve destinos evaluados frente a la línea base de <strong class="text-white">Chamberí (Madrid)</strong>.
+      En cada ciudad se analiza el <em>barrio socioeconómicamente equivalente</em>: seguro, residencial, con vida cultural,
+      comercio local y nivel adquisitivo medio-alto. Perfil: hispanohablante nativo con inglés fluido.
+    </p>
+    <div id="kpis" class="mt-6 grid grid-cols-2 lg:grid-cols-4 gap-3"></div>
+  </div>
+</header>
+
+<main class="max-w-7xl mx-auto px-4 sm:px-6 py-6 space-y-6">
+
+  <!-- ============ CONTROLES ============ -->
+  <section class="bg-white rounded-2xl shadow-sm ring-1 ring-slate-200 p-4 sm:p-5 space-y-4">
+    <div class="flex flex-col lg:flex-row lg:items-center gap-4 justify-between">
+      <div id="viewTabs" class="inline-flex bg-slate-100 rounded-xl p-1 self-start">
+        <button data-view="table" class="view-btn flex items-center gap-2 px-3 sm:px-4 py-2 rounded-lg text-sm font-medium"><i data-lucide="table" class="w-4 h-4"></i>Tabla</button>
+        <button data-view="cards" class="view-btn flex items-center gap-2 px-3 sm:px-4 py-2 rounded-lg text-sm font-medium"><i data-lucide="layout-grid" class="w-4 h-4"></i>Fichas</button>
+        <button data-view="charts" class="view-btn flex items-center gap-2 px-3 sm:px-4 py-2 rounded-lg text-sm font-medium"><i data-lucide="activity" class="w-4 h-4"></i>Gráficos</button>
+      </div>
+      <div class="flex flex-wrap items-center gap-2">
+        <label for="sortSel" class="text-sm text-slate-500">Ordenar por</label>
+        <select id="sortSel" class="text-sm rounded-lg border border-slate-300 bg-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"></select>
+        <button id="dirBtn" title="Invertir orden" class="flex items-center gap-1 text-sm rounded-lg border border-slate-300 px-3 py-2 hover:bg-slate-50">
+          <i data-lucide="arrow-up-down" class="w-4 h-4"></i><span id="dirLabel"></span>
+        </button>
+      </div>
+    </div>
+
+    <div id="filters" class="flex flex-wrap gap-2"></div>
+
+    <details class="rounded-xl bg-slate-50 ring-1 ring-slate-200">
+      <summary class="cursor-pointer flex items-center justify-between px-4 py-3 text-sm font-medium text-slate-700">
+        <span class="flex items-center gap-2"><i data-lucide="sliders-horizontal" class="w-4 h-4 text-emerald-600"></i>Personaliza la puntuación global (pesos por criterio)</span>
+        <i data-lucide="chevron-down" class="chev w-4 h-4 transition-transform"></i>
+      </summary>
+      <div class="px-4 pb-4">
+        <div id="weightSliders" class="grid sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-4"></div>
+        <button id="resetWeights" class="mt-4 text-xs text-blue-700 hover:underline">Restablecer pesos por defecto</button>
+      </div>
+    </details>
+  </section>
+
+  <!-- ============ VISTAS ============ -->
+  <section id="view-table" class="fade-in"></section>
+  <section id="view-cards" class="hidden fade-in"></section>
+  <section id="view-charts" class="hidden fade-in"></section>
+
+  <!-- ============ METODOLOGÍA ============ -->
+  <section class="bg-white rounded-2xl shadow-sm ring-1 ring-slate-200 p-5 text-sm text-slate-600 space-y-2">
+    <h2 class="flex items-center gap-2 font-semibold text-slate-800"><i data-lucide="info" class="w-4 h-4 text-blue-600"></i>Metodología y fuentes</h2>
+    <ul class="list-disc pl-5 space-y-1">
+      <li><strong>Coste de vida:</strong> índice relativo (Chamberí = 100) para un hogar de 2 personas con estilo de vida equivalente, <em>excluyendo</em> la compra de vivienda. Incluye alquiler, cesta, restauración, transporte y seguro médico obligatorio donde aplica.</li>
+      <li><strong>Vivienda:</strong> precio medio de compra de un piso de 2 habitaciones de ~80 m² en el barrio equivalente (portales inmobiliarios locales, Idealista, Wüest Partner, Observatoire de l'Habitat, agencias locales). Precios suizos convertidos a 1 CHF ≈ 1,07 €.</li>
+      <li><strong>Puntuaciones 0–10:</strong> coste y vivienda se normalizan (más barato = más alto; vivienda en escala logarítmica). Seguridad y calidad de vida combinan índices tipo Numbeo, Mercer y percepción local. Idioma = facilidad para un hispanohablante con inglés fluido. Acogida al expat = apertura de la población local y facilidad para hacer vida social (encuestas tipo InterNations Expat Insider y percepción local). Integración UE = grado de acceso práctico al marco europeo.</li>
+      <li><strong>Aviso:</strong> cifras orientativas de 2025–2026 con fines comparativos. Verifica precios, normativa fiscal y requisitos de residencia con fuentes oficiales y asesoría profesional antes de decidir.</li>
+    </ul>
+  </section>
+  <p class="text-center text-xs text-slate-400 pb-6">Comparativa de Ciudades · Línea base Chamberí, Madrid · Archivo autocontenido</p>
+</main>
+
+<!-- ============ MODAL DE DETALLE ============ -->
+<div id="modal" class="fixed inset-0 z-50 hidden" role="dialog" aria-modal="true">
+  <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" data-close></div>
+  <div class="relative h-full overflow-y-auto p-3 sm:p-8" data-close>
+    <div id="modalBody" class="relative max-w-4xl mx-auto bg-white rounded-2xl shadow-2xl fade-in"></div>
+  </div>
+</div>
+
+<script>
+/* =========================================================
+   DATOS
+   ========================================================= */
+const SIZE_M2 = 80;
+const CRITERIA = [
+  { key: 'cost',     label: 'Coste de vida',     short: 'Coste',     icon: 'wallet' },
+  { key: 'housing',  label: 'Vivienda (compra)', short: 'Vivienda',  icon: 'house' },
+  { key: 'safety',   label: 'Seguridad',         short: 'Seguridad', icon: 'shield-check' },
+  { key: 'qol',      label: 'Calidad de vida',   short: 'Calidad',   icon: 'heart-pulse' },
+  { key: 'language', label: 'Facilidad idioma',  short: 'Idioma',    icon: 'languages' },
+  { key: 'eu',       label: 'Integración UE',    short: 'UE',        icon: 'flag' },
+  { key: 'friendly', label: 'Acogida al expat',  short: 'Acogida',   icon: 'handshake' },
+];
+const DEFAULT_WEIGHTS = { cost: 20, housing: 20, safety: 15, qol: 15, language: 10, eu: 10, friendly: 10 };
+let weights = { ...DEFAULT_WEIGHTS };
+
+const CITIES = [
+  {
+    id: 'madrid', name: 'Madrid', country: 'España', flag: '🇪🇸', baseline: true, tags: ['eu'],
+    barrio: 'Chamberí', barriosAlt: 'Almagro · Trafalgar · Ríos Rosas · Arapiles · Gaztambide · Vallehermoso',
+    analogy: 'La referencia: fincas de principios del s. XX, calles comerciales (Fuencarral, Ponzano, Santa Engracia), mercados municipales, teatros y colegios de prestigio, a 10 minutos del centro. Seguro, familiar y con vida de barrio intensa.',
+    costIndex: 100, m2: 7900, m2Note: '≈ 7.900 €/m²', rent: 2100,
+    safety: 8.0, qol: 8.5,
+    friendly: 8.5, friendlyNote: 'Cultura abierta y sociable; Madrid es una ciudad de acogida donde "nadie es de fuera". España figura de forma constante entre los países mejor valorados por expatriados en amabilidad local.',
+    lang: { name: 'Español', ease: 10, english: 5, note: 'Idioma nativo. El inglés solo es necesario en entornos profesionales internacionales.' },
+    eu: { label: 'Miembro UE', badge: 'member', score: 10, prob: '—', note: 'Estado miembro desde 1986. Euro, Schengen y plena libertad de circulación.' },
+    residency: 'Ciudadano español: sin trámites.',
+    taxes: 'IRPF progresivo; tramo autonómico de Madrid entre los más bajos de España (marginal máx. ≈ 45%). Patrimonio bonificado al 100% en la región (aplica el impuesto estatal de solidaridad > 3 M€).',
+    pros: ['Oferta cultural, gastronómica y de ocio de primer nivel', 'Idioma, red social y familiar ya establecidas', 'Hub aéreo (Barajas) y AVE a toda España', 'Sanidad pública y privada de alta calidad', 'Vida de barrio muy completa y caminable'],
+    cons: ['Vivienda en máximos históricos: comprar en Chamberí exige > 600.000 €', 'Alquileres tensionados y escasa oferta', 'Veranos cada vez más calurosos', 'Ruido y densidad', 'Salarios bajos en relación con el precio de la vivienda'],
+    verdict: 'La línea base: excelente calidad de vida y cultura, pero con un problema grave de acceso a la vivienda.'
+  },
+  {
+    id: 'andorra', name: 'Andorra la Vella', country: 'Andorra', flag: '🇦🇩', tags: ['noeu', 'micro'],
+    barrio: 'Centro / Escaldes-Engordany', barriosAlt: 'Av. Meritxell · Prat de la Creu · Escaldes centro (Av. Carlemany)',
+    analogy: 'El eje Av. Meritxell–Carlemany funciona como un Fuencarral/Eloy Gonzalo en miniatura: comercio a pie de calle, cafés y paseo, pero en un valle de montaña de ~45.000 habitantes (conurbación). Escaldes es la zona residencial más cotizada, con Caldea y servicios a pie.',
+    costIndex: 92, m2: 6000, m2Note: '≈ 6.000 €/m²', rent: 1700,
+    safety: 9.6, qol: 8.4,
+    friendly: 7.0, friendlyNote: 'Sociedad pequeña y mayoritariamente inmigrante (españoles, portugueses, franceses), por lo que es fácil encajar. La comunidad andorrana de origen es más cerrada y la vida social gira en torno a trabajo y deporte.',
+    lang: { name: 'Catalán (español de uso diario)', ease: 9, english: 5, note: 'El catalán es la lengua oficial y exigida en la administración y algunos empleos, pero el español se habla en todas partes. Para un madrileño, el catalán es muy accesible (B2 en ~6–12 meses).' },
+    eu: { label: 'No UE · Acuerdo de asociación', badge: 'assoc', score: 6, prob: '< 5% (adhesión plena)', note: 'Usa el euro por acuerdo monetario y mantiene unión aduanera parcial. Negoció un Acuerdo de Asociación con la UE (acceso al mercado interior) que prevé someter a referéndum. La adhesión plena no está en la agenda.' },
+    residency: 'Sin libre circulación UE. Residencia activa (contrato laboral o sociedad propia, sujeta a cupos) o pasiva/no lucrativa: inversión mínima ≈ 600.000 € + depósito ≈ 47.500 € en la AFA y ≥ 90 días/año de estancia. Restricciones y recargos recientes a la compra por no residentes.',
+    taxes: 'IRPF máx. 10%. IGI (IVA) 4,5%. Sin impuesto de patrimonio ni sucesiones.',
+    pros: ['Fiscalidad muy favorable (IRPF máx. 10%)', 'Una de las ciudades más seguras de Europa', 'Naturaleza, esquí y montaña a minutos', 'Idioma sin barrera real para un hispanohablante', 'A ~2 h de Barcelona y ~3 h de Toulouse'],
+    cons: ['Sin aeropuerto ni tren: dependencia del coche/bus', 'Vivienda escasísima; alquiler muy competido', 'Requisitos de residencia exigentes (inversión o empleo con cupo)', 'Oferta cultural limitada frente a Madrid', 'Sensación de "pueblo grande" y aislamiento en invierno'],
+    verdict: 'Ideal para patrimonio, seguridad y naturaleza; peaje alto en conectividad, cultura y acceso a vivienda.'
+  },
+  {
+    id: 'zurich', name: 'Zúrich', country: 'Suiza (alemana)', flag: '🇨🇭', tags: ['noeu', 'suiza'],
+    barrio: 'Hottingen / Fluntern (Kreis 7)', barriosAlt: 'Kreis 7 · Oberstrass (Kreis 6) · Seefeld (Kreis 8)',
+    analogy: 'Hottingen y Fluntern reproducen el Chamberí de Almagro: edificios burgueses de principios del s. XX, tranvía en la puerta, cafés, colegios y a un paseo de la universidad (ETH/UZH), el Kunsthaus y el lago.',
+    costIndex: 182, m2: 19800, m2Note: '≈ 18.500 CHF/m² (≈ 19.800 €)', rent: 4300,
+    safety: 9.3, qol: 9.4,
+    friendly: 4.5, friendlyNote: 'Educados y respetuosos, pero reservados: hacer amigos suizos lleva años. Suiza suele puntuar bajo en amabilidad y facilidad para hacer amigos en encuestas a expatriados; la vida social se apoya en la comunidad internacional y los clubs (Vereine).',
+    lang: { name: 'Alemán estándar + suizo alemán', ease: 3, english: 8, note: 'El inglés funciona en el trabajo internacional, pero la vida social y la integración pasan por el alemán (B1 exigido para el permiso C) y el Schweizerdeutsch coloquial, distinto del alemán estándar.' },
+    eu: { label: 'No UE · Bilaterales + Schengen', badge: 'bilateral', score: 7, prob: '< 2%', note: 'Miembro de la AELC y de Schengen con ~120 acuerdos bilaterales. El paquete "Bilaterales III" (concluido en dic. 2024) está en ratificación y probablemente irá a referéndum. La adhesión no está sobre la mesa.' },
+    residency: 'Libre circulación de personas (ALCP) para españoles: permiso B con contrato laboral o medios suficientes + seguro médico suizo.',
+    taxes: 'Carga combinada (federal + cantón + municipio) ≈ 20–35% según renta (marginal máx. ≈ 40%). Impuesto cantonal sobre patrimonio. Seguro médico obligatorio ≈ 400–550 CHF/mes por adulto.',
+    pros: ['Salarios entre los más altos del mundo', 'Transporte público y servicios impecables', 'Lago, Alpes y aeropuerto hub a 10 min', 'Seguridad y limpieza sobresalientes', 'Residencia sencilla gracias a la libre circulación'],
+    cons: ['Coste de vida extremo (≈ +80% vs Chamberí)', 'Vivienda casi imposible: vacancia < 0,1%', 'Barrera idiomática real (suizo alemán)', 'Vida social más fría y reservada', 'Seguro médico privado obligatorio caro'],
+    verdict: 'La mejor opción si hay un salario suizo detrás; sin él, el coste la hace inviable.'
+  },
+  {
+    id: 'ginebra', name: 'Ginebra', country: 'Suiza (francesa)', flag: '🇨🇭', tags: ['noeu', 'suiza'],
+    barrio: 'Champel / Eaux-Vives', barriosAlt: 'Champel · Eaux-Vives · Florissant · (Lausana: Sous-Gare, Chailly)',
+    analogy: 'Champel es el Chamberí burgués: residencial, parques, colegios internacionales y el hospital universitario cerca. Eaux-Vives aporta el ambiente de Ponzano: bistrós, comercio de barrio y vida en la calle junto al lago. Alternativa más asequible: Lausana (Sous-Gare/Chailly, ≈ 12.000 CHF/m²).',
+    costIndex: 176, m2: 17100, m2Note: '≈ 16.000 CHF/m² (≈ 17.100 €)', rent: 3900,
+    safety: 8.0, qol: 9.0,
+    friendly: 6.0, friendlyNote: 'Ciudad muy internacional (~40% de extranjeros): es fácil encontrar comunidad expat, aunque los ginebrinos tienen fama de distantes. La vida social local mejora mucho con el francés.',
+    lang: { name: 'Francés', ease: 7, english: 7, note: 'Lengua romana con gramática y léxico muy próximos al español. Un hispanohablante suele alcanzar B2 en 12–18 meses. La comunidad internacional (ONU, ONG, banca) facilita el día a día en inglés.' },
+    eu: { label: 'No UE · Bilaterales + Schengen', badge: 'bilateral', score: 7, prob: '< 2%', note: 'Mismo estatus que el resto de Suiza. Frontera abierta con Francia: muchos residentes viven en el lado francés (Grand Genève).' },
+    residency: 'Libre circulación (ALCP): permiso B con contrato o medios propios. Opción de vivir en Francia y trabajar en Ginebra (permiso G).',
+    taxes: 'Uno de los cantones con mayor presión fiscal de Suiza (marginal máx. ≈ 45%). Seguro médico obligatorio ≈ 500–650 CHF/mes.',
+    pros: ['Francés: idioma muy accesible para hispanohablantes', 'Ciudad global y muy internacional', 'Lago, Alpes y Mont Blanc a 1 h', 'Vuelos directos frecuentes a Madrid', 'Frontera con Francia amplía opciones de vivienda'],
+    cons: ['Coste casi al nivel de Zúrich', 'Presión fiscal alta para estándares suizos', 'Escasez crónica de vivienda', 'Más hurtos que otras ciudades suizas', 'Tráfico de trabajadores fronterizos'],
+    verdict: 'El mejor equilibrio suizo entre idioma accesible y entorno internacional, a un precio muy alto.'
+  },
+  {
+    id: 'lugano', name: 'Lugano', country: 'Suiza (italiana)', flag: '🇨🇭', tags: ['noeu', 'suiza'],
+    barrio: 'Centro-Besso / Castagnola', barriosAlt: 'Centro · Besso · Paradiso · Castagnola · Cassarate',
+    analogy: 'El centro con soportales y Via Nassa evoca el Chamberí comercial; Besso es el residencial de clase media-alta junto a la estación, y Castagnola/Cassarate la versión tranquila con vistas al lago y paseo marítimo.',
+    costIndex: 140, m2: 11200, m2Note: '≈ 10.500 CHF/m² (≈ 11.200 €)', rent: 2500,
+    safety: 9.2, qol: 8.6,
+    friendly: 5.5, friendlyNote: 'Trato cordial y mediterráneo en lo superficial, pero sociedad pequeña y algo cerrada, con cierta desconfianza hacia los trabajadores fronterizos. El italiano abre puertas rápido.',
+    lang: { name: 'Italiano', ease: 9, english: 6, note: 'La lengua más cercana al español de toda la lista tras el catalán: comprensión casi inmediata y B2 en 6–12 meses. El inglés se usa menos que en Zúrich o Ginebra.' },
+    eu: { label: 'No UE · Bilaterales + Schengen', badge: 'bilateral', score: 7, prob: '< 2%', note: 'Estatus suizo. A 1 h de Milán (Malpensa/Linate), con fuerte integración con Lombardía.' },
+    residency: 'Libre circulación (ALCP): permiso B con contrato o medios propios.',
+    taxes: 'Presión fiscal intermedia en el contexto suizo. Seguro médico obligatorio ≈ 400–500 CHF/mes.',
+    pros: ['Italiano: prácticamente sin barrera idiomática', 'Clima más suave y luminoso de Suiza', 'Más asequible que Zúrich y Ginebra', 'Lago, montaña y Milán a 1 h', 'Muy segura y tranquila'],
+    cons: ['Mercado laboral pequeño y salarios menores que en el norte suizo', 'Vida nocturna y cultural limitada', 'Población envejecida', 'Sin aeropuerto con vuelos regulares propios (se usa Milán o Zúrich)', 'Dumping salarial por trabajadores fronterizos'],
+    verdict: 'La puerta de entrada más amable a Suiza para un hispanohablante; ideal con trabajo remoto o sector financiero local.'
+  },
+  {
+    id: 'oviedo', name: 'Oviedo', country: 'España (Asturias)', flag: '🇪🇸', tags: ['eu'],
+    barrio: 'Centro (Uría – Campoamor)', barriosAlt: 'Uría · El Campillín · Campo San Francisco · (Gijón: Albéniz, Centro–Playa San Lorenzo)',
+    analogy: 'El eje Uría–Campo San Francisco–Gascona es un Chamberí compacto: comercio tradicional, Teatro Campoamor, temporada de ópera, sidrerías y todo a pie. Alternativa: Gijón (Albéniz/Centro, ≈ 3.200 €/m²) añade playa urbana y más vida de verano.',
+    costIndex: 72, m2: 2900, m2Note: '≈ 2.900 €/m² (Gijón ≈ 3.200 €/m²)', rent: 1000,
+    safety: 9.0, qol: 8.2,
+    friendly: 8.0, friendlyNote: 'Asturianos cercanos y hospitalarios, con vida social en sidrerías y bares. Pocos expatriados, pero para un madrileño la integración es inmediata; los círculos de amistad de toda la vida pueden tardar algo en abrirse.',
+    lang: { name: 'Español', ease: 10, english: 4, note: 'Sin barrera. El asturiano (bable) tiene presencia cultural pero no es necesario.' },
+    eu: { label: 'Miembro UE', badge: 'member', score: 10, prob: '—', note: 'Excepción dentro de la UE: mismo país, mismo sistema sanitario, fiscal y legal.' },
+    residency: 'Sin trámites (cambio de empadronamiento).',
+    taxes: 'Tramo autonómico de IRPF de los más altos de España (marginal máx. ≈ 50%). Impuesto de patrimonio vigente.',
+    pros: ['Vivienda ≈ 60% más barata que en Chamberí', 'Una de las capitales más seguras de España', 'Gastronomía, naturaleza y mar a 30 min', 'Mismo idioma, sanidad y sistema', 'AVE a Madrid en ≈ 3 h 15 min (variante de Pajares)'],
+    cons: ['Clima lluvioso y gris buena parte del año', 'Mercado laboral reducido', 'Aeropuerto pequeño con pocas rutas', 'Población envejecida', 'Fiscalidad autonómica alta'],
+    verdict: 'La mejor relación calidad-precio si se trabaja en remoto: vida de Chamberí a mitad de precio, con peor clima.'
+  },
+  {
+    id: 'luxemburgo', name: 'Luxemburgo', country: 'Luxemburgo', flag: '🇱🇺', tags: ['eu', 'micro'],
+    barrio: 'Belair / Limpertsberg', barriosAlt: 'Belair · Limpertsberg · Merl · Ville-Haute',
+    analogy: 'Belair y Limpertsberg son el Chamberí de Arapiles/Vallehermoso: bulevares arbolados, pisos burgueses, mercado semanal, liceos y parques, a pie del centro histórico. A escala de ciudad pequeña (~135.000 hab.).',
+    costIndex: 132, m2: 11000, m2Note: '≈ 11.000 €/m²', rent: 2900,
+    safety: 8.6, qol: 8.7,
+    friendly: 6.5, friendlyNote: 'Casi la mitad de la población es extranjera, así que ser expat es lo normal y hay mucha comunidad internacional (incluida española). Los luxemburgueses de origen son corteses pero reservados y hacen vida aparte.',
+    lang: { name: 'Francés · Alemán · Luxemburgués', ease: 6, english: 9, note: 'Trilingüe real: francés (administración), alemán (prensa, escuela) y luxemburgués (vida social; exigido para la nacionalidad). El inglés es suficiente para vivir y trabajar en el sector financiero e instituciones UE.' },
+    eu: { label: 'Miembro UE (fundador)', badge: 'member', score: 10, prob: '—', note: 'Estado fundador y sede de instituciones UE (TJUE, BEI, Tribunal de Cuentas). Euro y Schengen.' },
+    residency: 'Ciudadano UE: registro municipal y certificado de registro. Sin permisos.',
+    taxes: 'IRPF progresivo con marginal máx. ≈ 42% + recargo de solidaridad. Salario mínimo más alto de la UE.',
+    pros: ['Salarios y salario mínimo más altos de la UE', 'Transporte público gratuito en todo el país', 'Entorno multilingüe con inglés operativo', 'Seguridad y servicios públicos excelentes', 'Sin trámites al ser UE'],
+    cons: ['Vivienda carísima (aunque bajó tras 2022)', 'Ciudad pequeña con vida cultural limitada', 'Clima gris y lluvioso', 'Trilingüismo necesario para integrarse de verdad', 'Tráfico intenso por trabajadores fronterizos'],
+    verdict: 'Opción sólida dentro de la UE si hay empleo local (finanzas, instituciones, tech); cara para trabajo remoto.'
+  },
+  {
+    id: 'sanmarino', name: 'San Marino', country: 'San Marino', flag: '🇸🇲', tags: ['noeu', 'micro'],
+    barrio: 'Borgo Maggiore / Città', barriosAlt: 'Borgo Maggiore · Città (Murata) · Domagnano · Serravalle–Dogana (comercial)',
+    analogy: 'Borgo Maggiore es el "barrio de vida diaria" de la capital: plaza porticada con mercado semanal desde la Edad Media, comercio de proximidad, cafés y el funicular que sube a la Città histórica. Es un Chamberí de escala pueblo (~34.000 habitantes en todo el país): residencial, muy seguro y acomodado, pero con muy poca vida cultural propia; para eso se baja a Rimini (20 min) o Bolonia (1 h 30).',
+    costIndex: 88, m2: 3300, m2Note: '≈ 3.300 €/m²', rent: 1100,
+    safety: 9.5, qol: 7.9,
+    friendly: 6.5, friendlyNote: 'Trato amable pero comunidad muy pequeña y cerrada, donde todos se conocen y los apellidos pesan. Hay muy pocos expatriados residentes; la integración pasa por el italiano y por la vida social de Rimini.',
+    lang: { name: 'Italiano', ease: 9, english: 4, note: 'Italiano estándar (con dialecto romañol entre mayores). Comprensión casi inmediata para un hispanohablante y B2 en 6–12 meses. El inglés se usa poco fuera del turismo y la banca.' },
+    eu: { label: 'No UE · Acuerdo de asociación', badge: 'assoc', score: 6, prob: '< 5% (adhesión plena)', note: 'Unión aduanera con la UE desde 1991 y euro por acuerdo monetario. Ha negociado con la UE un Acuerdo de Asociación (junto a Andorra) que le daría acceso al mercado interior; está pendiente de firma y ratificación. La adhesión plena no está en la agenda. No pertenece a Schengen, pero la frontera con Italia está abierta.' },
+    residency: 'Sin libre circulación UE. Permisos de residencia muy restrictivos: vía empleo local (con prioridad a residentes) o residencia por inversión ("residenza elettiva") con requisitos patrimoniales elevados (compra de vivienda, inversión y/o ingresos mínimos). Alternativa habitual: vivir en Rimini (UE) y trabajar en San Marino.',
+    taxes: 'IRPF progresivo ≈ 9–35%. En lugar de IVA aplica un impuesto monofásico a la importación. Sin impuesto de patrimonio.',
+    pros: ['Seguridad altísima y entorno tranquilo', 'Vivienda ≈ 50% más barata que en Chamberí', 'Italiano: sin barrera real de idioma', 'Rimini y la costa adriática a 20 min; Bolonia a 1 h 30', 'Fiscalidad más baja que en Italia o España'],
+    cons: ['Residencia muy difícil de obtener sin empleo o inversión', 'Oferta cultural y de ocio muy limitada', 'Sin aeropuerto ni tren (aeropuerto de Rimini a 20 min)', 'Mercado laboral diminuto', 'Muy turístico en verano y aislado en invierno'],
+    verdict: 'Seguro, asequible e italiano, pero es un pueblo con estatus de Estado: tiene sentido como base tranquila con ingresos remotos, no como sustituto de la vida urbana de Chamberí.'
+  },
+  {
+    id: 'belgrado', name: 'Belgrado', country: 'Serbia', flag: '🇷🇸', tags: ['noeu', 'balcanes'],
+    barrio: 'Vračar', barriosAlt: 'Vračar (Neimar, Crveni Krst) · Dorćol · Senjak (más exclusivo)',
+    analogy: 'Vračar es probablemente el gemelo más fiel de Chamberí en esta lista: alta densidad, edificios de entreguerras, plazas (Slavija), el mercado de Kalenić como su "Mercado de Vallehermoso", cafés y librerías, y a un paseo del centro (Knez Mihailova). Dorćol aporta el ambiente creativo tipo Malasaña.',
+    costIndex: 56, m2: 4200, m2Note: '≈ 4.200 €/m² (Vračar)', rent: 1100,
+    safety: 7.4, qol: 7.1,
+    friendly: 8.5, friendlyNote: 'Hospitalidad serbia legendaria: es fácil que te inviten a casa o a una rakija. Comunidad expat y nómada digital creciente. Puede haber recelo hacia Occidente en temas políticos (OTAN 1999), rara vez en lo personal.',
+    lang: { name: 'Serbio (cirílico y latino)', ease: 3, english: 7, note: 'Lengua eslava con 7 casos gramaticales. Ventaja para hispanohablantes: fonética muy clara (se lee como se escribe). El inglés está muy extendido entre menores de 40 años.' },
+    eu: { label: 'Candidata (desde 2012)', badge: 'candidate', score: 4, prob: '≈ 20–25% antes de 2035', note: 'Negociaciones abiertas desde 2014 (22 de 35 capítulos abiertos, 2 cerrados). Estancadas por Kosovo, Estado de derecho y la no alineación con las sanciones a Rusia. Protestas masivas desde finales de 2024.' },
+    residency: 'Estancia sin visado 90/180 días. Residencia temporal por empleo, empresa propia, compra de inmueble o reunificación familiar. Permiso único de residencia y trabajo desde 2024.',
+    taxes: 'Impuesto sobre salarios 10% (más cotizaciones). Tributación sencilla para autónomos (paušal).',
+    pros: ['Coste de vida ≈ 45% inferior a Chamberí', 'Ciudad vibrante: cultura, música, vida nocturna', 'Gente cálida y cultura de café similar a la española', 'Inglés muy extendido en jóvenes', 'Residencia accesible (incluida vía compra de vivienda)'],
+    cons: ['Inestabilidad política y protestas recurrentes', 'Contaminación del aire en invierno', 'Idioma difícil y burocracia lenta', 'Sanidad pública irregular (privada barata y buena)', 'Se sigue fumando en muchos interiores'],
+    verdict: 'La alternativa más "Chamberí" en ambiente y precio fuera de la UE; asume riesgo político y burocrático.'
+  },
+  {
+    id: 'sarajevo', name: 'Sarajevo', country: 'Bosnia y Herzegovina', flag: '🇧🇦', tags: ['noeu', 'balcanes'],
+    barrio: 'Centar (Koševo / Ciglane)', barriosAlt: 'Koševo · Ciglane · Marijin Dvor · Mejtaš',
+    analogy: 'Centar–Koševo/Ciglane: residencial en ladera con mezcla de arquitectura austrohúngara y yugoslava, a 10 minutos a pie de Ferhadija y Baščaršija. Un Chamberí más pequeño, con más historia y menos poder adquisitivo; Marijin Dvor es el eje de oficinas y comercio moderno.',
+    costIndex: 46, m2: 2800, m2Note: '≈ 2.800 €/m²', rent: 750,
+    safety: 7.0, qol: 6.4,
+    friendly: 8.5, friendlyNote: 'Hospitalidad bosnia muy cálida y cultura de café (kafa) que facilita conocer gente. Comunidad expat pequeña (ONG, organismos internacionales). Temas de la guerra y la política conviene tratarlos con tacto.',
+    lang: { name: 'Bosnio (latino y cirílico)', ease: 3, english: 6, note: 'Prácticamente idéntico al serbio y al croata (misma dificultad gramatical). Se usa mayoritariamente el alfabeto latino. Inglés razonable en jóvenes y sector servicios.' },
+    eu: { label: 'Candidata (desde 2022)', badge: 'candidate', score: 3, prob: '≈ 10–15% antes de 2035', note: 'Candidata desde dic. 2022. El Consejo Europeo aprobó abrir negociaciones en marzo de 2024, pero la primera conferencia intergubernamental sigue pendiente de reformas. Estructura institucional muy compleja (Dayton).' },
+    residency: 'Estancia sin visado 90 días. Residencia temporal por empleo, empresa, propiedad inmobiliaria o motivos familiares.',
+    taxes: 'Impuesto sobre la renta 10% (más cotizaciones).',
+    pros: ['La ciudad más barata de la comparativa', 'Riqueza cultural e histórica única (Festival de Cine de Sarajevo)', 'Montaña y esquí olímpico (Jahorina, Bjelašnica) a 30 min', 'Hospitalidad y cultura de café', 'Fiscalidad baja y sencilla'],
+    cons: ['Contaminación invernal de las peores de Europa (valle + calefacción)', 'Complejidad política e institucional', 'Salarios y mercado laboral débiles', 'Pocas conexiones aéreas directas', 'Servicios públicos y sanidad limitados'],
+    verdict: 'Máxima asequibilidad y carácter; recomendable solo con ingresos remotos y tolerancia a los inviernos contaminados.'
+  },
+];
+
+/* =========================================================
+   CÁLCULOS
+   ========================================================= */
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const price2br = c => c.m2 * SIZE_M2;
+const BASE = CITIES.find(c => c.baseline);
+
+function scoresOf(c) {
+  return {
+    cost: clamp(10 - (c.costIndex - 45) * 9 / 145, 1, 10),
+    housing: clamp(10 - 9 * Math.log(price2br(c) / 200000) / Math.log(8), 1, 10),
+    safety: c.safety,
+    qol: c.qol,
+    language: c.lang.ease,
+    eu: c.eu.score,
+    friendly: c.friendly,
+  };
+}
+function overallOf(s) {
+  let t = 0, w = 0;
+  for (const k in weights) { t += weights[k] * s[k]; w += weights[k]; }
+  return w ? t / w : 0;
+}
+function recompute() {
+  CITIES.forEach(c => { c._s = scoresOf(c); c._overall = overallOf(c._s); });
+}
+
+/* =========================================================
+   FORMATO
+   ========================================================= */
+const fmtEUR = n => Math.round(n).toLocaleString('de-DE') + ' €';
+const fmtK = n => n >= 1e6 ? (n / 1e6).toLocaleString('de-DE', { maximumFractionDigits: 2 }) + ' M€' : Math.round(n / 1000).toLocaleString('de-DE') + ' k€';
+const fmt1 = n => n.toLocaleString('es-ES', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+
+function scoreColor(s) {
+  if (s >= 8) return { text: 'text-emerald-700', bg: 'bg-emerald-500', soft: 'bg-emerald-50 ring-emerald-200' };
+  if (s >= 6) return { text: 'text-blue-700', bg: 'bg-blue-500', soft: 'bg-blue-50 ring-blue-200' };
+  if (s >= 4) return { text: 'text-amber-700', bg: 'bg-amber-500', soft: 'bg-amber-50 ring-amber-200' };
+  return { text: 'text-rose-700', bg: 'bg-rose-500', soft: 'bg-rose-50 ring-rose-200' };
+}
+function bar(score, wide = false) {
+  const c = scoreColor(score);
+  return `<div class="flex items-center gap-2">
+    <div class="${wide ? 'w-full' : 'w-16'} h-1.5 rounded-full bg-slate-200 overflow-hidden"><div class="h-full ${c.bg} rounded-full" style="width:${score * 10}%"></div></div>
+    <span class="text-xs font-semibold tabular-nums ${c.text}">${fmt1(score)}</span></div>`;
+}
+function delta(val, base, lowerIsBetter = true) {
+  if (val === base) return `<span class="text-xs text-slate-400">base</span>`;
+  const pct = Math.round((val / base - 1) * 100);
+  const good = lowerIsBetter ? pct < 0 : pct > 0;
+  return `<span class="text-xs font-semibold ${good ? 'text-emerald-600' : 'text-rose-600'}">${pct > 0 ? '+' : ''}${pct}%</span>`;
+}
+function euBadge(c) {
+  const map = {
+    member: 'bg-blue-100 text-blue-800 ring-blue-200',
+    bilateral: 'bg-slate-100 text-slate-700 ring-slate-300',
+    assoc: 'bg-indigo-50 text-indigo-700 ring-indigo-200',
+    candidate: 'bg-amber-50 text-amber-800 ring-amber-200',
+  };
+  return `<span class="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium ring-1 whitespace-nowrap ${map[c.eu.badge]}">${c.eu.label}</span>`;
+}
+
+/* =========================================================
+   ESTADO, ORDEN Y FILTROS
+   ========================================================= */
+const SORTS = {
+  overall:  { label: 'Puntuación global',          get: c => c._overall,     dir: 'desc' },
+  cost:     { label: 'Coste de vida',              get: c => c.costIndex,    dir: 'asc' },
+  price:    { label: 'Precio compra 2 hab.',       get: c => price2br(c),    dir: 'asc' },
+  rent:     { label: 'Alquiler 2 hab.',            get: c => c.rent,         dir: 'asc' },
+  safety:   { label: 'Seguridad',                  get: c => c.safety,       dir: 'desc' },
+  qol:      { label: 'Calidad de vida',            get: c => c.qol,          dir: 'desc' },
+  language: { label: 'Facilidad del idioma',       get: c => c.lang.ease,    dir: 'desc' },
+  english:  { label: 'Uso del inglés',             get: c => c.lang.english, dir: 'desc' },
+  eu:       { label: 'Integración / adhesión UE',  get: c => c.eu.score,     dir: 'desc' },
+  friendly: { label: 'Acogida al expatriado',      get: c => c.friendly,     dir: 'desc' },
+  name:     { label: 'Nombre (A–Z)',               get: c => c.name,         dir: 'asc' },
+};
+const FILTERS = [
+  { id: 'all',      label: 'Todas',              test: () => true },
+  { id: 'noeu',     label: 'Fuera de la UE',     test: c => c.tags.includes('noeu') || c.baseline },
+  { id: 'eu',       label: 'Dentro de la UE',    test: c => c.tags.includes('eu') },
+  { id: 'suiza',    label: 'Suiza',              test: c => c.tags.includes('suiza') || c.baseline },
+  { id: 'balcanes', label: 'Balcanes',           test: c => c.tags.includes('balcanes') || c.baseline },
+  { id: 'micro',    label: 'Microestados',       test: c => c.tags.includes('micro') || c.baseline },
+  { id: 'cheaper',  label: 'Más baratas que Chamberí', test: c => c.costIndex <= 100 },
+];
+const state = { view: 'table', filter: 'all', sort: 'overall', dir: 'desc' };
+
+function visibleCities() {
+  const f = FILTERS.find(f => f.id === state.filter);
+  const s = SORTS[state.sort];
+  const list = CITIES.filter(f.test);
+  list.sort((a, b) => {
+    const va = s.get(a), vb = s.get(b);
+    const cmp = typeof va === 'string' ? va.localeCompare(vb, 'es') : va - vb;
+    return state.dir === 'asc' ? cmp : -cmp;
+  });
+  return list;
+}
+
+/* =========================================================
+   RENDER: KPIs
+   ========================================================= */
+function renderKPIs() {
+  const others = CITIES.filter(c => !c.baseline);
+  const best = [...CITIES].sort((a, b) => b._overall - a._overall)[0];
+  const cheapest = [...others].sort((a, b) => a.costIndex - b.costIndex)[0];
+  const safest = [...others].sort((a, b) => b.safety - a.safety)[0];
+  const langNonEs = [...others].filter(c => c.lang.ease < 10).sort((a, b) => b.lang.ease - a.lang.ease)[0];
+  const kpi = (icon, label, c, sub) => `
+    <button data-open="${c.id}" class="text-left rounded-xl bg-white/10 hover:bg-white/15 ring-1 ring-white/15 p-3 sm:p-4 transition">
+      <div class="flex items-center gap-2 text-[11px] uppercase tracking-wide text-blue-200"><i data-lucide="${icon}" class="w-3.5 h-3.5"></i>${label}</div>
+      <div class="mt-1 text-base sm:text-lg font-semibold">${c.flag} ${c.name}</div>
+      <div class="text-xs text-emerald-300">${sub}</div>
+    </button>`;
+  document.getElementById('kpis').innerHTML =
+    kpi('trophy', 'Mejor puntuación', best, `${fmt1(best._overall)} / 10 con tus pesos`) +
+    kpi('wallet', 'Más asequible', cheapest, `Coste ${cheapest.costIndex} vs 100 Chamberí`) +
+    kpi('shield-check', 'Más segura', safest, `Seguridad ${fmt1(safest.safety)} / 10`) +
+    kpi('languages', 'Idioma más fácil (no ES)', langNonEs, `${langNonEs.lang.name}`);
+}
+
+/* =========================================================
+   RENDER: CONTROLES
+   ========================================================= */
+function renderControls() {
+  document.querySelectorAll('.view-btn').forEach(b => {
+    const on = b.dataset.view === state.view;
+    b.className = `view-btn flex items-center gap-2 px-3 sm:px-4 py-2 rounded-lg text-sm font-medium transition ${on ? 'bg-white shadow text-blue-800' : 'text-slate-500 hover:text-slate-800'}`;
+  });
+  document.getElementById('filters').innerHTML = FILTERS.map(f => {
+    const on = f.id === state.filter;
+    return `<button data-filter="${f.id}" class="px-3 py-1.5 rounded-full text-sm font-medium ring-1 transition ${on ? 'bg-emerald-600 text-white ring-emerald-600' : 'bg-white text-slate-600 ring-slate-300 hover:ring-emerald-500 hover:text-emerald-700'}">${f.label}</button>`;
+  }).join('');
+  document.getElementById('dirLabel').textContent = state.dir === 'asc' ? 'Ascendente' : 'Descendente';
+  ['table', 'cards', 'charts'].forEach(v => document.getElementById('view-' + v).classList.toggle('hidden', v !== state.view));
+}
+
+function renderWeights() {
+  document.getElementById('weightSliders').innerHTML = CRITERIA.map(k => `
+    <label class="block">
+      <div class="flex justify-between text-sm"><span class="flex items-center gap-1.5 text-slate-700"><i data-lucide="${k.icon}" class="w-4 h-4 text-slate-400"></i>${k.label}</span>
+      <span class="font-semibold tabular-nums text-emerald-700" id="wv-${k.key}">${weights[k.key]}</span></div>
+      <input type="range" min="0" max="50" step="5" value="${weights[k.key]}" data-weight="${k.key}" class="w-full mt-1">
+    </label>`).join('');
+}
+
+/* =========================================================
+   RENDER: TABLA
+   ========================================================= */
+function renderTable(list) {
+  const th = (t, cls = '') => `<th class="px-3 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500 whitespace-nowrap ${cls}">${t}</th>`;
+  const rows = list.map(c => {
+    const oc = scoreColor(c._overall);
+    return `<tr data-open="${c.id}" class="cursor-pointer hover:bg-blue-50/60 transition ${c.baseline ? 'bg-emerald-50/50' : ''}">
+      <td class="sticky left-0 z-10 px-3 py-3 ${c.baseline ? 'bg-emerald-50' : 'bg-white'}">
+        <div class="flex items-center gap-2 min-w-[150px]"><span class="text-xl">${c.flag}</span>
+          <div><div class="font-semibold text-slate-900">${c.name}${c.baseline ? ' <span class="ml-1 text-[10px] uppercase bg-emerald-600 text-white rounded px-1.5 py-0.5 align-middle">base</span>' : ''}</div>
+          <div class="text-xs text-slate-500">${c.country}</div></div></div></td>
+      <td class="px-3 py-3 text-sm text-slate-700 min-w-[160px]">${c.barrio}</td>
+      <td class="px-3 py-3"><div class="text-sm font-semibold tabular-nums">${c.costIndex}</div>${delta(c.costIndex, BASE.costIndex)}</td>
+      <td class="px-3 py-3 whitespace-nowrap"><div class="text-sm font-semibold tabular-nums">${fmtK(price2br(c))}</div>${delta(price2br(c), price2br(BASE))}</td>
+      <td class="px-3 py-3 text-xs text-slate-600 whitespace-nowrap tabular-nums">${fmtEUR(c.m2)}</td>
+      <td class="px-3 py-3 text-sm tabular-nums whitespace-nowrap">${fmtEUR(c.rent)}</td>
+      <td class="px-3 py-3">${bar(c.safety)}</td>
+      <td class="px-3 py-3">${bar(c.qol)}</td>
+      <td class="px-3 py-3"><div class="text-xs text-slate-600 mb-1 min-w-[120px]">${c.lang.name}</div>${bar(c.lang.ease)}</td>
+      <td class="px-3 py-3">${bar(c.friendly)}</td>
+      <td class="px-3 py-3"><div class="mb-1">${euBadge(c)}</div><div class="text-[11px] text-slate-500 whitespace-nowrap">Prob.: ${c.eu.prob}</div></td>
+      <td class="px-3 py-3 text-center"><span class="inline-flex items-center justify-center w-12 h-8 rounded-lg ring-1 text-sm font-bold tabular-nums ${oc.soft} ${oc.text}">${fmt1(c._overall)}</span></td>
+    </tr>`;
+  }).join('');
+  document.getElementById('view-table').innerHTML = `
+    <div class="bg-white rounded-2xl shadow-sm ring-1 ring-slate-200 overflow-hidden">
+      <div class="flex items-center justify-between px-4 sm:px-5 py-3 border-b border-slate-200">
+        <h2 class="font-semibold text-slate-800">Vista de pájaro</h2>
+        <span class="text-xs text-slate-500">Haz clic en una fila para ver la ficha completa</span>
+      </div>
+      <div class="overflow-x-auto scroll-thin">
+        <table class="min-w-full divide-y divide-slate-100">
+          <thead class="bg-slate-50"><tr>
+            ${th('Ciudad', 'sticky left-0 bg-slate-50 z-10')}${th('Barrio ≈ Chamberí')}${th('Coste vida<br><span class="normal-case font-normal">(Chamberí = 100)</span>')}
+            ${th('Compra 2 hab.<br><span class="normal-case font-normal">(~80 m²)</span>')}${th('€/m²')}${th('Alquiler<br><span class="normal-case font-normal">2 hab./mes</span>')}
+            ${th('Seguridad')}${th('Calidad vida')}${th('Idioma')}${th('Acogida<br><span class="normal-case font-normal">al expat</span>')}${th('Estatus UE')}${th('Global', 'text-center')}
+          </tr></thead>
+          <tbody class="divide-y divide-slate-100">${rows}</tbody>
+        </table>
+      </div>
+    </div>`;
+}
+
+/* =========================================================
+   RENDER: FICHAS
+   ========================================================= */
+function renderCards(list) {
+  document.getElementById('view-cards').innerHTML = `<div class="grid sm:grid-cols-2 xl:grid-cols-3 gap-4">${list.map(c => {
+    const oc = scoreColor(c._overall);
+    return `<article class="group bg-white rounded-2xl shadow-sm ring-1 ${c.baseline ? 'ring-emerald-400' : 'ring-slate-200'} p-5 flex flex-col hover:shadow-md hover:-translate-y-0.5 transition">
+      <div class="flex items-start justify-between gap-3">
+        <div>
+          <div class="text-2xl">${c.flag}</div>
+          <h3 class="mt-1 text-lg font-bold text-slate-900">${c.name}</h3>
+          <p class="text-xs text-slate-500">${c.country}</p>
+        </div>
+        <div class="text-right">
+          <div class="inline-flex items-center justify-center w-14 h-10 rounded-xl ring-1 text-lg font-bold tabular-nums ${oc.soft} ${oc.text}">${fmt1(c._overall)}</div>
+          <div class="text-[10px] text-slate-400 mt-1">global</div>
+        </div>
+      </div>
+      <div class="mt-3 flex items-center gap-1.5 text-sm text-blue-800"><i data-lucide="map-pin" class="w-4 h-4"></i><span class="font-medium">${c.barrio}</span></div>
+      <div class="mt-2">${euBadge(c)}</div>
+      <div class="mt-4 grid grid-cols-3 gap-2 text-center">
+        <div class="rounded-lg bg-slate-50 p-2"><div class="text-[10px] uppercase text-slate-500">Coste</div><div class="font-semibold tabular-nums">${c.costIndex}</div>${delta(c.costIndex, BASE.costIndex)}</div>
+        <div class="rounded-lg bg-slate-50 p-2"><div class="text-[10px] uppercase text-slate-500">Compra</div><div class="font-semibold tabular-nums">${fmtK(price2br(c))}</div>${delta(price2br(c), price2br(BASE))}</div>
+        <div class="rounded-lg bg-slate-50 p-2"><div class="text-[10px] uppercase text-slate-500">Alquiler</div><div class="font-semibold tabular-nums">${fmtEUR(c.rent)}</div>${delta(c.rent, BASE.rent)}</div>
+      </div>
+      <div class="mt-4 space-y-2">${CRITERIA.map(k => `<div class="grid grid-cols-[92px_1fr] items-center gap-2"><span class="text-xs text-slate-500">${k.short}</span>${bar(c._s[k.key], true)}</div>`).join('')}</div>
+      <p class="mt-4 text-sm text-slate-600 flex-1">${c.verdict}</p>
+      <button data-open="${c.id}" class="mt-4 inline-flex items-center justify-center gap-2 rounded-xl bg-blue-700 hover:bg-blue-800 text-white text-sm font-medium py-2.5 transition">
+        Ver ficha completa <i data-lucide="arrow-right" class="w-4 h-4"></i></button>
+    </article>`;
+  }).join('')}</div>`;
+}
+
+/* =========================================================
+   RENDER: GRÁFICOS
+   ========================================================= */
+const charts = {};
+function destroyChart(id) { if (charts[id]) { charts[id].destroy(); delete charts[id]; } }
+const PALETTE = { base: '#059669', eu: '#1d4ed8', noeu: '#64748b', grid: '#e2e8f0' };
+const colorFor = c => c.baseline ? PALETTE.base : c.tags.includes('eu') ? PALETTE.eu : PALETTE.noeu;
+
+function renderCharts(list) {
+  const el = document.getElementById('view-charts');
+  el.innerHTML = `
+    <div class="flex flex-wrap gap-4 text-xs text-slate-600 mb-3">
+      <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-sm" style="background:${PALETTE.base}"></span>Chamberí (base)</span>
+      <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-sm" style="background:${PALETTE.eu}"></span>Dentro UE</span>
+      <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-sm" style="background:${PALETTE.noeu}"></span>Fuera UE</span>
+    </div>
+    <div class="grid lg:grid-cols-2 gap-4">
+      ${['Precio de compra · 2 hab. (~80 m²)|chPrice', 'Índice de coste de vida (Chamberí = 100)|chCost', 'Puntuación global ponderada (0–10)|chOverall', 'Coste de vida vs. calidad de vida|chScatter']
+        .map(s => { const [t, id] = s.split('|'); return `<div class="bg-white rounded-2xl shadow-sm ring-1 ring-slate-200 p-4"><h3 class="text-sm font-semibold text-slate-700 mb-3">${t}</h3><div class="relative h-72"><canvas id="${id}"></canvas></div></div>`; }).join('')}
+    </div>`;
+  if (typeof Chart === 'undefined') { el.insertAdjacentHTML('beforeend', '<p class="mt-4 text-sm text-rose-600">No se pudo cargar Chart.js (se necesita conexión a Internet).</p>'); return; }
+
+  Chart.defaults.font.family = 'Inter, system-ui, sans-serif';
+  Chart.defaults.color = '#475569';
+  const labels = list.map(c => c.name);
+  const colors = list.map(colorFor);
+  const hbar = (id, data, fmt, extra = {}) => {
+    destroyChart(id);
+    charts[id] = new Chart(document.getElementById(id), {
+      type: 'bar',
+      data: { labels, datasets: [{ data, backgroundColor: colors, borderRadius: 6, maxBarThickness: 26 }] },
+      options: {
+        indexAxis: 'y', maintainAspectRatio: false,
+        plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => fmt(ctx.raw) } } },
+        scales: { x: { grid: { color: PALETTE.grid }, ticks: { callback: v => fmt(v) }, ...extra }, y: { grid: { display: false } } },
+        onClick: (e, els) => els.length && openDetail(list[els[0].index].id),
+      },
+    });
+  };
+  hbar('chPrice', list.map(price2br), fmtK);
+  hbar('chCost', list.map(c => c.costIndex), v => v, { beginAtZero: true });
+  hbar('chOverall', list.map(c => +c._overall.toFixed(2)), v => fmt1(+v), { min: 0, max: 10 });
+
+  destroyChart('chScatter');
+  charts.chScatter = new Chart(document.getElementById('chScatter'), {
+    type: 'bubble',
+    data: { datasets: list.map(c => ({
+      label: c.name,
+      data: [{ x: c.costIndex, y: c.qol, r: 6 + c.safety }],
+      backgroundColor: colorFor(c) + 'b3', borderColor: colorFor(c),
+    })) },
+    options: {
+      maintainAspectRatio: false,
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => `${ctx.dataset.label}: coste ${ctx.raw.x}, calidad ${fmt1(ctx.raw.y)}` } } },
+      scales: {
+        x: { title: { display: true, text: 'Coste de vida (← más barato)' }, grid: { color: PALETTE.grid } },
+        y: { title: { display: true, text: 'Calidad de vida' }, min: 5.5, max: 10, grid: { color: PALETTE.grid } },
+      },
+      onClick: (e, els) => els.length && openDetail(list[els[0].datasetIndex].id),
+    },
+  });
+}
+
+/* =========================================================
+   MODAL DE DETALLE
+   ========================================================= */
+function openDetail(id) {
+  const c = CITIES.find(x => x.id === id);
+  const oc = scoreColor(c._overall);
+  const metric = (label, val, sub = '') => `<div class="rounded-xl bg-slate-50 ring-1 ring-slate-200 p-3"><div class="text-[11px] uppercase tracking-wide text-slate-500">${label}</div><div class="mt-0.5 font-bold text-slate-900 tabular-nums">${val}</div>${sub}</div>`;
+  const block = (icon, title, body, tone = 'text-blue-700') => `<div><h4 class="flex items-center gap-2 text-sm font-semibold text-slate-800"><i data-lucide="${icon}" class="w-4 h-4 ${tone}"></i>${title}</h4><p class="mt-1 text-sm text-slate-600 leading-relaxed">${body}</p></div>`;
+
+  document.getElementById('modalBody').innerHTML = `
+    <div class="rounded-t-2xl bg-gradient-to-br from-slate-900 to-blue-800 text-white p-5 sm:p-7">
+      <button data-close class="absolute top-4 right-4 p-2 rounded-lg hover:bg-white/10" aria-label="Cerrar"><i data-lucide="x" class="w-5 h-5"></i></button>
+      <div class="flex items-center gap-3"><span class="text-4xl">${c.flag}</span>
+        <div><h2 class="text-2xl sm:text-3xl font-bold">${c.name}</h2><p class="text-blue-200 text-sm">${c.country}</p></div>
+        <div class="ml-auto mr-10 text-center hidden sm:block"><div class="text-3xl font-extrabold tabular-nums">${fmt1(c._overall)}</div><div class="text-[11px] text-blue-200">global / 10</div></div>
+      </div>
+      <p class="mt-4 text-sm text-blue-100">${c.verdict}</p>
+    </div>
+
+    <div class="p-5 sm:p-7 space-y-6">
+      <div class="rounded-xl bg-emerald-50 ring-1 ring-emerald-200 p-4">
+        <div class="flex items-center gap-2 text-sm font-semibold text-emerald-800"><i data-lucide="map-pin" class="w-4 h-4"></i>${c.baseline ? 'Barrio de referencia' : 'Equivalente a Chamberí'}: ${c.barrio}</div>
+        <div class="text-xs text-emerald-700 mt-0.5">${c.barriosAlt}</div>
+        <p class="mt-2 text-sm text-slate-700 leading-relaxed">${c.analogy}</p>
+      </div>
+
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        ${metric('Coste de vida', c.costIndex + ' <span class="text-xs font-normal text-slate-500">/ 100</span>', delta(c.costIndex, BASE.costIndex))}
+        ${metric('Compra 2 hab.', fmtK(price2br(c)), `<div class="text-[11px] text-slate-500">${c.m2Note}</div>`)}
+        ${metric('Alquiler 2 hab.', fmtEUR(c.rent) + '<span class="text-xs font-normal text-slate-500">/mes</span>', delta(c.rent, BASE.rent))}
+        ${metric('Seguridad', fmt1(c.safety) + ' <span class="text-xs font-normal text-slate-500">/ 10</span>', `<div class="text-[11px] text-slate-500">Calidad de vida ${fmt1(c.qol)}</div>`)}
+      </div>
+
+      <div class="grid md:grid-cols-2 gap-6 items-start">
+        <div class="rounded-xl ring-1 ring-slate-200 p-3"><div class="relative h-64"><canvas id="chRadar"></canvas></div></div>
+        <div class="space-y-3">${CRITERIA.map(k => `<div class="grid grid-cols-[120px_1fr] items-center gap-2"><span class="flex items-center gap-1.5 text-xs text-slate-600"><i data-lucide="${k.icon}" class="w-3.5 h-3.5 text-slate-400"></i>${k.label}</span>${bar(c._s[k.key], true)}</div>`).join('')}</div>
+      </div>
+
+      <div class="grid md:grid-cols-2 gap-4">
+        <div class="rounded-xl bg-emerald-50/60 ring-1 ring-emerald-200 p-4">
+          <h4 class="flex items-center gap-2 font-semibold text-emerald-800"><i data-lucide="thumbs-up" class="w-4 h-4"></i>Pros</h4>
+          <ul class="mt-2 space-y-1.5">${c.pros.map(p => `<li class="flex gap-2 text-sm text-slate-700"><i data-lucide="check" class="w-4 h-4 text-emerald-600 shrink-0 mt-0.5"></i>${p}</li>`).join('')}</ul>
+        </div>
+        <div class="rounded-xl bg-rose-50/60 ring-1 ring-rose-200 p-4">
+          <h4 class="flex items-center gap-2 font-semibold text-rose-800"><i data-lucide="thumbs-down" class="w-4 h-4"></i>Contras</h4>
+          <ul class="mt-2 space-y-1.5">${c.cons.map(p => `<li class="flex gap-2 text-sm text-slate-700"><i data-lucide="x" class="w-4 h-4 text-rose-600 shrink-0 mt-0.5"></i>${p}</li>`).join('')}</ul>
+        </div>
+      </div>
+
+      <div class="grid md:grid-cols-2 gap-5">
+        ${block('languages', `Idioma: ${c.lang.name} · facilidad ${c.lang.ease}/10 · inglés en el día a día ${c.lang.english}/10`, c.lang.note)}
+        ${block('flag', `Unión Europea: ${c.eu.label} · probabilidad de adhesión ${c.eu.prob}`, c.eu.note)}
+        ${block('handshake', `Acogida al expatriado · ${fmt1(c.friendly)}/10`, c.friendlyNote, 'text-emerald-600')}
+        ${block('badge-check', 'Vía de residencia (ciudadano español)', c.residency, 'text-emerald-600')}
+        ${block('landmark', 'Fiscalidad', c.taxes, 'text-emerald-600')}
+      </div>
+    </div>`;
+
+  document.getElementById('modal').classList.remove('hidden');
+  document.body.style.overflow = 'hidden';
+  lucide.createIcons();
+
+  if (typeof Chart !== 'undefined') {
+    destroyChart('chRadar');
+    const ds = [{ label: c.name, data: CRITERIA.map(k => +c._s[k.key].toFixed(2)), backgroundColor: 'rgba(29,78,216,.18)', borderColor: '#1d4ed8', pointBackgroundColor: '#1d4ed8' }];
+    if (!c.baseline) ds.push({ label: 'Chamberí', data: CRITERIA.map(k => +BASE._s[k.key].toFixed(2)), backgroundColor: 'rgba(5,150,105,.10)', borderColor: '#059669', borderDash: [4, 4], pointBackgroundColor: '#059669' });
+    charts.chRadar = new Chart(document.getElementById('chRadar'), {
+      type: 'radar',
+      data: { labels: CRITERIA.map(k => k.short), datasets: ds },
+      options: { maintainAspectRatio: false, scales: { r: { min: 0, max: 10, ticks: { stepSize: 2, display: false }, grid: { color: PALETTE.grid } } }, plugins: { legend: { position: 'bottom', labels: { boxWidth: 12 } } } },
+    });
+  }
+}
+function closeDetail() {
+  document.getElementById('modal').classList.add('hidden');
+  document.body.style.overflow = '';
+  destroyChart('chRadar');
+}
+
+/* =========================================================
+   CICLO PRINCIPAL Y EVENTOS
+   ========================================================= */
+function render() {
+  recompute();
+  const list = visibleCities();
+  renderControls();
+  renderKPIs();
+  if (state.view === 'table') renderTable(list);
+  if (state.view === 'cards') renderCards(list);
+  if (state.view === 'charts') renderCharts(list);
+  lucide.createIcons();
+}
+
+document.getElementById('sortSel').innerHTML = Object.entries(SORTS).map(([k, v]) => `<option value="${k}">${v.label}</option>`).join('');
+
+document.addEventListener('click', e => {
+  const open = e.target.closest('[data-open]');
+  if (open) return openDetail(open.dataset.open);
+  if (e.target.closest('#modalBody [data-close]') || (e.target.hasAttribute && e.target.hasAttribute('data-close'))) return closeDetail();
+  const v = e.target.closest('[data-view]');
+  if (v) { state.view = v.dataset.view; return render(); }
+  const f = e.target.closest('[data-filter]');
+  if (f) { state.filter = f.dataset.filter; return render(); }
+});
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeDetail(); });
+document.getElementById('sortSel').addEventListener('change', e => { state.sort = e.target.value; state.dir = SORTS[state.sort].dir; render(); });
+document.getElementById('dirBtn').addEventListener('click', () => { state.dir = state.dir === 'asc' ? 'desc' : 'asc'; render(); });
+document.getElementById('weightSliders').addEventListener('input', e => {
+  const k = e.target.dataset.weight; if (!k) return;
+  weights[k] = +e.target.value;
+  document.getElementById('wv-' + k).textContent = weights[k];
+  render();
+});
+document.getElementById('resetWeights').addEventListener('click', () => { weights = { ...DEFAULT_WEIGHTS }; renderWeights(); render(); });
+
+renderWeights();
+render();
+</script>
+</body>
+</html>
